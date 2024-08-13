@@ -1,0 +1,77 @@
+install.packages('tidyverse')
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#handling missing values
+clean_spotify_songs <- Most_Streamed_Spotify_Songs_2024 %>%
+  distinct() %>%
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .))) %>%
+  mutate(across(where(~ !is.numeric(.)), ~ ifelse(is.na(.), "Unknown", .))) 
+
+
+#Who was the most streamed artist?
+top_artist<- clean_spotify_songs %>%
+  count(Artist,sort = TRUE) %>%
+  slice(1) %>%
+  pull(Artist)
+
+ print(paste("the most streamed artist for 2024 is:",top_artist))
+
+
+#Which was the most streamed song?
+top_song<-clean_spotify_songs [which.max(clean_spotify_songs$`Spotify Streams`), "Track"]
+print(paste('Most Streamed Song on Spotify was:',top_song))
+
+
+#Which was the most popular song?
+popular_song<-clean_spotify_songs[which.max(clean_spotify_songs$`Spotify Popularity`),"Track"]
+
+print(paste("The most popular song was:",popular_song))
+
+#summarize statistics of various platforms
+summary_streams <- summary(clean_spotify_songs %>% select(`Spotify Streams`, `YouTube Views`, `Pandora Streams`, `Soundcloud Streams`))
+print(summary_streams)
+
+#compare the streams between different platforms
+performance_comparison <- clean_spotify_songs %>%
+  pivot_longer(
+    cols = c(`Spotify Streams`, `YouTube Views`, `Pandora Streams`,`Soundcloud Streams`),
+               names_to = "platform",
+               values_to = "streams_views_plays") %>%
+  group_by(platform) %>%
+  summarise(
+    mean_performance = mean(streams_views_plays),
+    median_performance = median(streams_views_plays)
+  )
+
+print(performance_comparison)
+
+#searching for the top songs among different platform playlist
+song_playlist_counts <- clean_spotify_songs %>%
+  summarise(
+    top_spotify = Track[which.max(`Spotify Playlist Reach`)],
+    top_youtube = Track[which.max(`YouTube Playlist Reach`)],
+    top_apple_music = Track[which.max(`Apple Music Playlist Count`)],
+    top_deezer = Track[which.max(`Deezer Playlist Reach`)],
+    top_amazon = Track[which.max(`Amazon Playlist Count`)]
+  )
+
+#printing the result for each platform separately
+for (i in colnames(song_playlist_counts)) {
+print(paste("The No1 song on" , i ,"playlist is:", song_playlist_counts[i]))
+}
+
+
+#Aggregate data by artist
+artist_data <- clean_spotify_songs %>%
+  group_by(Artist) %>%
+  summarize(
+    spotify_popularity = mean(`Spotify Popularity`, na.rm = TRUE),
+    youtube_likes = mean(`YouTube Likes`, na.rm = TRUE),
+    tiktok_likes = mean(`TikTok Likes`, na.rm = TRUE)
+  )
+
+#perform a regression 
+model<- lm(spotify_popularity~ youtube_likes+ tiktok_likes +Artist, data = artist_data)
+summary(model)
